@@ -1,78 +1,70 @@
 import fs from "fs";
 
 export class PolicyOcr {
-    private static ZERO =
+    private ZERO =
         " _ " +
         "| |" +
         "|_|";
 
-    private static ONE =
+    private ONE =
         "   " +
         "  |" +
         "  |";
 
-    private static TWO =
+    private TWO =
         " _ " +
         " _|" +
         "|_ ";
 
-    private static THREE =
+    private THREE =
         " _ " +
         " _|" +
         " _|";
 
-    private static FOUR =
+    private FOUR =
         "   " +
         "|_|" +
         "  |";
 
-    private static FIVE =
+    private FIVE =
         " _ " +
         "|_ " +
         " _|";
 
-    private static SIX =
+    private SIX =
         " _ " +
         "|_ " +
         "|_|";
 
-    private static SEVEN =
+    private SEVEN =
         " _ " +
         "  |" +
         "  |";
 
-    private static EIGHT =
+    private EIGHT =
         " _ " +
         "|_|" +
         "|_|";
 
-    private static NINE =
+    private NINE =
         " _ " +
         "|_|" +
         " _|";
 
-    private static DIGIT_MAP: { [key: string]: string } = {
-        [PolicyOcr.ZERO]: '0',
-        [PolicyOcr.ONE]: '1',
-        [PolicyOcr.TWO]: '2',
-        [PolicyOcr.THREE]: '3',
-        [PolicyOcr.FOUR]: '4',
-        [PolicyOcr.FIVE]: '5',
-        [PolicyOcr.SIX]: '6',
-        [PolicyOcr.SEVEN]: '7',
-        [PolicyOcr.EIGHT]: '8',
-        [PolicyOcr.NINE]: '9'
+    private DIGIT_MAP: { [key: string]: string } = {
+        [this.ZERO]: '0',
+        [this.ONE]: '1',
+        [this.TWO]: '2',
+        [this.THREE]: '3',
+        [this.FOUR]: '4',
+        [this.FIVE]: '5',
+        [this.SIX]: '6',
+        [this.SEVEN]: '7',
+        [this.EIGHT]: '8',
+        [this.NINE]: '9'
     };
 
-    static parseEntry(entryLine: string): string {
-        const entryLines = entryLine.split('\n')
-        if (entryLines.length != 4) {
-            throw new RangeError('Error parsing policy')
-        }
-
-        if (!entryLines.every(line => line.length === 27)) {
-            throw new RangeError('Line length must be 27 characters');
-        }
+    parseEntry(entryLines: string[]): string {
 
         return [...Array(9).keys()]
             .map(i => {
@@ -86,7 +78,7 @@ export class PolicyOcr {
             .join("");
     }
 
-    static validateChecksum(policyNumber: string): boolean {
+    validateChecksum(policyNumber: string): boolean {
         if (!/^\d+$/.test(policyNumber)) {
             return false;
         }
@@ -102,17 +94,33 @@ export class PolicyOcr {
         return sum % 11 === 0;
     }
 
-    static processAndOutputFile(inputFile: string, outputFile: string) {
+    validateFile(entryLines: string[]): boolean {
+        if (entryLines.length % 4 !== 0) {
+            throw new RangeError('Error parsing policy')
+        }
+
+        if (!entryLines.every(line => line.length === 27)) {
+            throw new RangeError('Line length must be 27 characters');
+        }
+
+        return true
+    }
+
+    processAndOutputFile(inputFile: string, outputFile: string) {
         const entries = fs.readFileSync(inputFile, 'utf-8').split('\n');
+
+        if(!this.validateFile(entries)) {
+            return;
+        }
 
         const outputText: string[] = [];
 
         for (let i = 0; i < entries.length; i += 4) {
-            const entryLines = entries.slice(i, i + 4).join('\n');
-            let entry = PolicyOcr.parseEntry(entryLines);
+            const entryLines = entries.slice(i, i + 4);
+            let entry = this.parseEntry(entryLines);
             if (entry.includes("?")) {
                 entry += " ILL"
-            } else if (!PolicyOcr.validateChecksum(entry)) {
+            } else if (!this.validateChecksum(entry)) {
                 entry += " ERR"
             }
             outputText.push(entry);

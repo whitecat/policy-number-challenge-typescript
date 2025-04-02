@@ -2,8 +2,10 @@ import {PolicyOcr} from '../src/policy_ocr';
 import * as fs from 'fs';
 
 describe('PolicyOcr', () => {
+    let policyOcr: PolicyOcr = new PolicyOcr();
+
     it('loads', () => {
-        expect(PolicyOcr).toBeDefined();
+        expect(policyOcr).toBeDefined();
     });
 
     it('loads the sample.txt', () => {
@@ -12,38 +14,17 @@ describe('PolicyOcr', () => {
     });
 
     describe('parseEntry', () => {
-        it('parse document throws error if entry line is not 4 lines', () => {
-            const entryLine = [
-                "    _  _     _  _  _  _  _ ",
-                "  | _| _||_||_ |_   ||_||_|",
-                "  ||_  _|  | _||_|  ||_| _|",
-            ].join('\n');
-
-            expect(() => PolicyOcr.parseEntry(entryLine)).toThrow(RangeError);
-        })
-
-        it('parse document throws error if entry line are not all 27 characters in length', () => {
-            const entryLine = [
-                "    _  _     _  _  _  _  _ ",
-                "  | _| _||_||_ |_   ||_||_|",
-                "  ||_  _|  | _||_|  ||_| _",
-                "                           ",
-            ].join('\n');
-
-            expect(() => PolicyOcr.parseEntry(entryLine)).toThrow(RangeError);
-        })
-
         it('parse document reads in a single line', () => {
             const entryLine = [
                 "    _  _     _  _  _  _  _ ",
                 "  | _| _||_||_ |_   ||_||_|",
                 "  ||_  _|  | _||_|  ||_| _|",
                 "                           ",
-            ].join('\n');
+            ]
 
-            PolicyOcr.parseEntry(entryLine)
+            policyOcr.parseEntry(entryLine)
 
-            expect(PolicyOcr.parseEntry(entryLine)).toBe("123456789");
+            expect(policyOcr.parseEntry(entryLine)).toBe("123456789");
         })
 
         it('Add ? for entries that are not digits', () => {
@@ -52,33 +33,67 @@ describe('PolicyOcr', () => {
                 "  | _| _ |_||_ |_   ||_||_|",
                 "  ||_  _|  | _||_|  ||_| _|",
                 "                           ",
-            ].join('\n');
+            ]
 
-            PolicyOcr.parseEntry(entryLine)
+            policyOcr.parseEntry(entryLine)
 
-            expect(PolicyOcr.parseEntry(entryLine)).toBe("12?456789");
+            expect(policyOcr.parseEntry(entryLine)).toBe("12?456789");
         })
     })
 
     describe('validateChecksum', () => {
         it('return true if policy number is valid', () => {
             const policyNumber = "000000000";
-            expect(PolicyOcr.validateChecksum(policyNumber)).toBe(true);
+            expect(policyOcr.validateChecksum(policyNumber)).toBe(true);
         })
 
         it('return true if policy number is valid another check', () => {
             const policyNumber = "000000051";
-            expect(PolicyOcr.validateChecksum(policyNumber)).toBe(true);
+            expect(policyOcr.validateChecksum(policyNumber)).toBe(true);
         })
 
         it('returns false if policy number is invalid', () => {
             const policyNumber = "000000021";
-            expect(PolicyOcr.validateChecksum(policyNumber)).toBe(false);
+            expect(policyOcr.validateChecksum(policyNumber)).toBe(false);
         })
 
         it('returns false if policy number contains illegal character', () => {
             const policyNumber = "0000000?1";
-            expect(PolicyOcr.validateChecksum(policyNumber)).toBe(false);
+            expect(policyOcr.validateChecksum(policyNumber)).toBe(false);
+        })
+    })
+
+    describe('validateFile', () => {
+        it('validateFile throws error if entry line is not lines not dividable by 4', () => {
+            const entryLines = [
+                "    _  _     _  _  _  _  _ ",
+                "  | _| _||_||_ |_   ||_||_|",
+                "  ||_  _|  | _||_|  ||_| _|",
+            ]
+
+            expect(() => policyOcr.validateFile(entryLines)).toThrow(RangeError);
+        })
+
+        it('validateFile throws error if entry line are not all 27 characters in length', () => {
+            const entryLines = [
+                "    _  _     _  _  _  _  _ ",
+                "  | _| _||_||_ |_   ||_||_|",
+                "  ||_  _|  | _||_|  ||_| _",
+                "                           ",
+            ]
+
+            expect(() => policyOcr.validateFile(entryLines)).toThrow(RangeError);
+        })
+
+        it('passes true with valid file', () => {
+            const entryLines = [
+                "    _  _     _  _  _  _  _ ",
+                "  | _| _ |_||_ |_   ||_||_|",
+                "  ||_  _|  | _||_|  ||_| _|",
+                "                           ",
+            ]
+
+            expect(policyOcr.validateFile(entryLines)).toBe(true);
         })
     })
 
@@ -106,7 +121,7 @@ describe('PolicyOcr', () => {
 
             fs.writeFileSync(inputFile, entryLine);
 
-            PolicyOcr.processAndOutputFile(inputFile, outputFile);
+            policyOcr.processAndOutputFile(inputFile, outputFile);
 
             const output = fs.readFileSync(outputFile, 'utf-8').split('\n');
             expect(output[0]).toBe("000000000");
@@ -122,7 +137,7 @@ describe('PolicyOcr', () => {
 
             fs.writeFileSync(inputFile, entryLine);
 
-            PolicyOcr.processAndOutputFile(inputFile, outputFile);
+            policyOcr.processAndOutputFile(inputFile, outputFile);
 
             const output = fs.readFileSync(outputFile, 'utf-8').split('\n');
             expect(output[0]).toBe("12345678? ILL");
@@ -138,7 +153,7 @@ describe('PolicyOcr', () => {
 
             fs.writeFileSync(inputFile, entryLine);
 
-            PolicyOcr.processAndOutputFile(inputFile, outputFile);
+            policyOcr.processAndOutputFile(inputFile, outputFile);
 
             const output = fs.readFileSync(outputFile, 'utf-8').split('\n');
             expect(output[0]).toBe("123456781 ERR");

@@ -44,3 +44,9 @@ This project uses:
 - TypeScript for static typing
 - Jest and ts-jest for testing
 
+
+## Assumptions
+
+I assume we want to not process a file if lineCount%4=0, or every line is 27 characters long because something is wrong with the file.
+
+

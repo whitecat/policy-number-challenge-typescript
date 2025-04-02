@@ -14,10 +14,11 @@ describe('PolicyOcr integration test', () => {
     });
 
     it('test large file outputs a correct file', () => {
+        const policyOcr = new PolicyOcr();
         const inputFile = path.resolve(__dirname, 'assets/sampleInput.txt');
         const expectedOutput = path.resolve(__dirname, 'assets/sampleOutput.txt');
 
-        PolicyOcr.processAndOutputFile(inputFile, outputFile);
+        policyOcr.processAndOutputFile(inputFile, outputFile);
 
         const output = fs.readFileSync(outputFile, 'utf-8').split('\n');
         const expected = fs.readFileSync(expectedOutput, 'utf-8').split('\n');
