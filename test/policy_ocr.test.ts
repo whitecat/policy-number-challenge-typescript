@@ -7,11 +7,11 @@ describe('PolicyOcr', () => {
     });
 
     it('loads the sample.txt', () => {
-        const sampleContent = fs.readFileSync('./test/assets/sample.txt', 'utf-8');
-        expect(sampleContent.split('\n').length).toBe(44);
+        const sampleContent = fs.readFileSync('./test/assets/sampleInput.txt', 'utf-8');
+        expect(sampleContent.split('\n').length).toBe(48);
     });
 
-    describe('User Story 1 - parseEntry - read in policy document', () => {
+    describe('parseEntry', () => {
         it('parse document throws error if entry line is not 4 lines', () => {
             const entryLine = [
                 "    _  _     _  _  _  _  _ ",
@@ -45,9 +45,22 @@ describe('PolicyOcr', () => {
 
             expect(PolicyOcr.parseEntry(entryLine)).toBe("123456789");
         })
+
+        it('Add ? for entries that are not digits', () => {
+            const entryLine = [
+                "    _  _     _  _  _  _  _ ",
+                "  | _| _ |_||_ |_   ||_||_|",
+                "  ||_  _|  | _||_|  ||_| _|",
+                "                           ",
+            ].join('\n');
+
+            PolicyOcr.parseEntry(entryLine)
+
+            expect(PolicyOcr.parseEntry(entryLine)).toBe("12?456789");
+        })
     })
 
-    describe('User Story 2 - validateChecksum', () => {
+    describe('validateChecksum', () => {
         it('return true if policy number is valid', () => {
             const policyNumber = "000000000";
             expect(PolicyOcr.validateChecksum(policyNumber)).toBe(true);
@@ -62,5 +75,73 @@ describe('PolicyOcr', () => {
             const policyNumber = "000000021";
             expect(PolicyOcr.validateChecksum(policyNumber)).toBe(false);
         })
+
+        it('returns false if policy number contains illegal character', () => {
+            const policyNumber = "0000000?1";
+            expect(PolicyOcr.validateChecksum(policyNumber)).toBe(false);
+        })
     })
+
+    describe('processAndOutputFile', () => {
+        let inputFile: string;
+        let outputFile: string;
+
+        beforeEach(() => {
+            inputFile = './test_input.txt';
+            outputFile = './test_output.txt';
+        });
+
+        afterEach(() => {
+            if (fs.existsSync(inputFile)) fs.unlinkSync(inputFile);
+            if (fs.existsSync(outputFile)) fs.unlinkSync(outputFile);
+        });
+
+        it('outputs a correct file', () => {
+            const entryLine = [
+                " _  _  _  _  _  _  _  _  _ ",
+                "| || || || || || || || || |",
+                "|_||_||_||_||_||_||_||_||_|",
+                "                           ",
+            ].join('\n');
+
+            fs.writeFileSync(inputFile, entryLine);
+
+            PolicyOcr.processAndOutputFile(inputFile, outputFile);
+
+            const output = fs.readFileSync(outputFile, 'utf-8').split('\n');
+            expect(output[0]).toBe("000000000");
+        });
+
+        it('if an error in text output add ILL', () => {
+            const entryLine = [
+                "    _  _     _  _  _  _  _ ",
+                "  | _| _||_||_ |_   ||_||_|",
+                "  ||_  _|  | _||_|  ||_| _ ",
+                "                           ",
+            ].join('\n');
+
+            fs.writeFileSync(inputFile, entryLine);
+
+            PolicyOcr.processAndOutputFile(inputFile, outputFile);
+
+            const output = fs.readFileSync(outputFile, 'utf-8').split('\n');
+            expect(output[0]).toBe("12345678? ILL");
+        });
+
+        it('if an not valid in text output add ERR', () => {
+            const entryLine = [
+                "    _  _     _  _  _  _    ",
+                "  | _| _||_||_ |_   ||_|  |",
+                "  ||_  _|  | _||_|  ||_|  |",
+                "                           ",
+            ].join('\n');
+
+            fs.writeFileSync(inputFile, entryLine);
+
+            PolicyOcr.processAndOutputFile(inputFile, outputFile);
+
+            const output = fs.readFileSync(outputFile, 'utf-8').split('\n');
+            expect(output[0]).toBe("123456781 ERR");
+        });
+    });
 });

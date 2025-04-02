@@ -1,3 +1,5 @@
+import fs from "fs";
+
 export class PolicyOcr {
     private static ZERO =
         " _ " +
@@ -79,12 +81,16 @@ export class PolicyOcr {
                     entryLines[0].slice(index, index + 3) +
                     entryLines[1].slice(index, index + 3) +
                     entryLines[2].slice(index, index + 3);
-                return this.DIGIT_MAP[digitStr];
+                return this.DIGIT_MAP[digitStr] || "?";
             })
             .join("");
     }
 
     static validateChecksum(policyNumber: string): boolean {
+        if (!/^\d+$/.test(policyNumber)) {
+            return false;
+        }
+
         const sum = policyNumber
             .split('')
             .reverse()
@@ -94,5 +100,24 @@ export class PolicyOcr {
             );
 
         return sum % 11 === 0;
+    }
+
+    static processAndOutputFile(inputFile: string, outputFile: string) {
+        const entries = fs.readFileSync(inputFile, 'utf-8').split('\n');
+
+        const outputText: string[] = [];
+
+        for (let i = 0; i < entries.length; i += 4) {
+            const entryLines = entries.slice(i, i + 4).join('\n');
+            let entry = PolicyOcr.parseEntry(entryLines);
+            if (entry.includes("?")) {
+                entry += " ILL"
+            } else if (!PolicyOcr.validateChecksum(entry)) {
+                entry += " ERR"
+            }
+            outputText.push(entry);
+        }
+
+        fs.writeFileSync(outputFile, outputText.join('\n'));
     }
 }
