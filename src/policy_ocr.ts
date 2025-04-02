@@ -67,7 +67,10 @@ export class PolicyOcr {
         if (entryLines.length != 4) {
             throw new RangeError('Error parsing policy')
         }
-        entryLines.every(line => line.length === 27) || (() => { throw new RangeError('Line length must be 27 characters'); })();
+
+        if (!entryLines.every(line => line.length === 27)) {
+            throw new RangeError('Line length must be 27 characters');
+        }
 
         return [...Array(9).keys()]
             .map(i => {
@@ -79,5 +82,17 @@ export class PolicyOcr {
                 return this.DIGIT_MAP[digitStr];
             })
             .join("");
+    }
+
+    static validateChecksum(policyNumber: string): boolean {
+        const sum = policyNumber
+            .split('')
+            .reverse()
+            .map(Number)
+            .reduce((acc, number, index) =>
+                acc + ((index + 1) * number)
+            );
+
+        return sum % 11 === 0;
     }
 }
