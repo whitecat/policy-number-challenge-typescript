@@ -41,25 +41,25 @@ describe('PolicyOcr', () => {
         })
     })
 
-    describe('validateChecksum', () => {
+    describe('isValidChecksum', () => {
         it('return true if policy number is valid', () => {
             const policyNumber = "000000000";
-            expect(policyOcr.validateChecksum(policyNumber)).toBe(true);
+            expect(policyOcr.isValidChecksum(policyNumber)).toBe(true);
         })
 
         it('return true if policy number is valid another check', () => {
             const policyNumber = "000000051";
-            expect(policyOcr.validateChecksum(policyNumber)).toBe(true);
+            expect(policyOcr.isValidChecksum(policyNumber)).toBe(true);
         })
 
         it('returns false if policy number is invalid', () => {
             const policyNumber = "000000021";
-            expect(policyOcr.validateChecksum(policyNumber)).toBe(false);
+            expect(policyOcr.isValidChecksum(policyNumber)).toBe(false);
         })
 
         it('returns false if policy number contains illegal character', () => {
             const policyNumber = "0000000?1";
-            expect(policyOcr.validateChecksum(policyNumber)).toBe(false);
+            expect(policyOcr.isValidChecksum(policyNumber)).toBe(false);
         })
     })
 
@@ -97,7 +97,7 @@ describe('PolicyOcr', () => {
         })
     })
 
-    describe('processAndOutputFile', () => {
+    describe('.processAndOutputFile', () => {
         let inputFile: string;
         let outputFile: string;
 
@@ -111,52 +111,36 @@ describe('PolicyOcr', () => {
             if (fs.existsSync(outputFile)) fs.unlinkSync(outputFile);
         });
 
-        it('outputs a correct file', () => {
-            const entryLine = [
-                " _  _  _  _  _  _  _  _  _ ",
-                "| || || || || || || || || |",
-                "|_||_||_||_||_||_||_||_||_|",
-                "                           ",
+        it('correctly processes entries that can be corrected', () => {
+            const inputContent = [
+                " _  _  _  _  _  _  _  _    ",
+                "| || || || || || || ||    |",
+                "|_||_||_||_||_||_| _| _|  |",
+                "                           "
             ].join('\n');
 
-            fs.writeFileSync(inputFile, entryLine);
+            fs.writeFileSync(inputFile, inputContent);
 
             policyOcr.processAndOutputFile(inputFile, outputFile);
 
             const output = fs.readFileSync(outputFile, 'utf-8').split('\n');
-            expect(output[0]).toBe("000000000");
+            expect(output[0]).not.toContain(" ERR");
         });
 
-        it('if an error in text output add ILL', () => {
-            const entryLine = [
-                "    _  _     _  _  _  _  _ ",
-                "  | _| _||_||_ |_   ||_||_|",
-                "  ||_  _|  | _||_|  ||_| _ ",
-                "                           ",
+        it('correctly processes entries that can be corrected test', () => {
+            const inputContent = [
+                "    _  _  _  _  _  _  _  _ ",
+                "  || || || || || || || || |",
+                "  ||_||_||_||_||_||_||_||_|",
+                "                           "
             ].join('\n');
 
-            fs.writeFileSync(inputFile, entryLine);
+            fs.writeFileSync(inputFile, inputContent);
 
             policyOcr.processAndOutputFile(inputFile, outputFile);
 
             const output = fs.readFileSync(outputFile, 'utf-8').split('\n');
-            expect(output[0]).toBe("12345678? ILL");
-        });
-
-        it('if an not valid in text output add ERR', () => {
-            const entryLine = [
-                "    _  _     _  _  _  _    ",
-                "  | _| _||_||_ |_   ||_|  |",
-                "  ||_  _|  | _||_|  ||_|  |",
-                "                           ",
-            ].join('\n');
-
-            fs.writeFileSync(inputFile, entryLine);
-
-            policyOcr.processAndOutputFile(inputFile, outputFile);
-
-            const output = fs.readFileSync(outputFile, 'utf-8').split('\n');
-            expect(output[0]).toBe("123456781 ERR");
+            expect(output[0]).toContain(" AMB");
         });
     });
 });

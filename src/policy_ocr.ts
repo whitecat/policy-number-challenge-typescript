@@ -1,5 +1,3 @@
-import fs from "fs";
-
 export class PolicyOcr {
     private ZERO =
         " _ " +
@@ -64,22 +62,29 @@ export class PolicyOcr {
         [this.NINE]: '9'
     };
 
-    parseEntry(entryLines: string[]): string {
+    private REVERSE_DIGIT_MAP: { [key: string]: string } = Object.fromEntries(
+        Object.entries(this.DIGIT_MAP).map(([key, value]) => [value, key])
+    );
 
-        return [...Array(9).keys()]
-            .map(i => {
-                const index = i * 3;
-                const digitStr =
-                    entryLines[0].slice(index, index + 3) +
-                    entryLines[1].slice(index, index + 3) +
-                    entryLines[2].slice(index, index + 3);
-                return this.DIGIT_MAP[digitStr] || "?";
-            })
-            .join("");
+    parseEntry(entryLines: string[]): string {
+        if (entryLines.length !== 4) {
+            return "Invalid entry";
+        }
+
+        const digits = Array.from({length: 9}, (_, i) => {
+            const digitStr =
+                entryLines[0].slice(i * 3, i * 3 + 3) +
+                entryLines[1].slice(i * 3, i * 3 + 3) +
+                entryLines[2].slice(i * 3, i * 3 + 3);
+
+            return this.DIGIT_MAP[digitStr] || '?';
+        });
+
+        return digits.join('');
     }
 
-    validateChecksum(policyNumber: string): boolean {
-        if (!/^\d+$/.test(policyNumber)) {
+    isValidChecksum(policyNumber: string): boolean {
+        if (!/^\d{9}$/.test(policyNumber)) {
             return false;
         }
 
@@ -87,11 +92,110 @@ export class PolicyOcr {
             .split('')
             .reverse()
             .map(Number)
-            .reduce((acc, number, index) =>
-                acc + ((index + 1) * number)
-            );
+            .reduce((acc, digit, idx) => acc + (idx + 1) * digit, 0);
 
         return sum % 11 === 0;
+    }
+
+    private tryReplacements(
+        currentPolicy: string[],
+        position: number,
+        stack: Array<{ currentPolicy: string[], position: number }>,
+        policyDigitStr: string | null
+    ): void {
+        for (const replacement of Object.keys(this.REVERSE_DIGIT_MAP)) {
+            if (policyDigitStr === null && currentPolicy[position] === replacement) continue;
+
+            const currentDigitStr = policyDigitStr || this.REVERSE_DIGIT_MAP[currentPolicy[position]];
+            const replacementDigitStr = this.REVERSE_DIGIT_MAP[replacement];
+
+            if (currentDigitStr && replacementDigitStr &&
+                this.checkDifferenceCount(currentDigitStr, replacementDigitStr)) {
+                const newPolicy = [...currentPolicy];
+                newPolicy[position] = replacement;
+                stack.push({currentPolicy: newPolicy, position: position + 1});
+            }
+        }
+    }
+
+    checkDifferenceCount(str1: string, str2: string): boolean {
+        if (str1.length !== str2.length) {
+            return false;
+        }
+
+        let diffCount = 0;
+
+        for (let i = 0; i < str1.length; i++) {
+            if (str1[i] !== str2[i]) {
+                diffCount++;
+                if (diffCount > 1) {
+                    return false;
+                }
+            }
+        }
+
+        return diffCount === 1;
+    }
+
+    searchErrCorrections(entryLines: string[]): string[] {
+        const corrections = new Set<string>();
+        const policy = this.parseEntry(entryLines).split('');
+        const stack: Array<{ currentPolicy: string[], position: number }> = [];
+        stack.push({currentPolicy: [...policy], position: 0});
+
+        while (stack.length > 0) {
+            const {currentPolicy, position} = stack.pop()!;
+            const policyNumber = currentPolicy.join('');
+            const validChecksum = this.isValidChecksum(policyNumber);
+
+            if (position === 9) {
+                if (validChecksum) {
+                    corrections.add(policyNumber);
+                }
+                continue;
+            }
+
+            if (!validChecksum) {
+                this.tryReplacements(currentPolicy, position, stack, null);
+            } else {
+                corrections.add(policyNumber);
+            }
+            stack.push({currentPolicy: currentPolicy, position: position + 1});
+        }
+
+        return [...corrections];
+    }
+
+    searchIllCorrections(entryLines: string[]): string[] {
+        const corrections: string[] = [];
+        const policy = this.parseEntry(entryLines).split('');
+        const stack: Array<{ currentPolicy: string[], position: number }> = [];
+
+        stack.push({currentPolicy: [...policy], position: 0});
+
+        while (stack.length > 0) {
+            const {currentPolicy, position} = stack.pop()!;
+
+            if (position === 9) {
+                const joinedPolicy = currentPolicy.join('');
+                if (this.isValidChecksum(joinedPolicy)) {
+                    corrections.push(joinedPolicy);
+                }
+                continue;
+            }
+
+            if (currentPolicy[position] === '?') {
+                const policyDigitStr =
+                    entryLines[0].slice(position * 3, position * 3 + 3) +
+                    entryLines[1].slice(position * 3, position * 3 + 3) +
+                    entryLines[2].slice(position * 3, position * 3 + 3);
+                this.tryReplacements(currentPolicy, position, stack, policyDigitStr);
+            } else {
+                stack.push({currentPolicy: currentPolicy, position: position + 1});
+            }
+        }
+
+        return corrections;
     }
 
     validateFile(entryLines: string[]): boolean {
@@ -106,26 +210,47 @@ export class PolicyOcr {
         return true
     }
 
-    processAndOutputFile(inputFile: string, outputFile: string) {
-        const entries = fs.readFileSync(inputFile, 'utf-8').split('\n');
+    processAndOutputFile(inputFile: string, outputFile: string): void {
+        const fs = require('fs');
+
+        const inputContent = fs.readFileSync(inputFile, 'utf-8');
+        const entries = inputContent.split('\n').filter(Boolean);
 
         if(!this.validateFile(entries)) {
             return;
         }
 
-        const outputText: string[] = [];
+        const results = [];
 
         for (let i = 0; i < entries.length; i += 4) {
             const entryLines = entries.slice(i, i + 4);
-            let entry = this.parseEntry(entryLines);
-            if (entry.includes("?")) {
-                entry += " ILL"
-            } else if (!this.validateChecksum(entry)) {
-                entry += " ERR"
+            const policy = this.parseEntry(entryLines);
+
+            if (policy.includes('?')) {
+                const corrections = this.searchIllCorrections(entryLines);
+
+                if (corrections.length === 1) {
+                    results.push(corrections[0]);
+                } else if (corrections.length === 0) {
+                    results.push(`${policy} ILL`);
+                } else {
+                    results.push(`${policy} AMB`);
+                }
+            } else if (this.isValidChecksum(policy)) {
+                results.push(policy);
+            } else {
+                const corrections = this.searchErrCorrections(entryLines);
+
+                if (corrections.length === 1) {
+                    results.push(corrections[0]);
+                } else if (corrections.length === 0) {
+                    results.push(`${policy} ERR`);
+                } else {
+                    results.push(`${policy} AMB`);
+                }
             }
-            outputText.push(entry);
         }
 
-        fs.writeFileSync(outputFile, outputText.join('\n'));
+        fs.writeFileSync(outputFile, results.join('\n'), 'utf-8');
     }
 }

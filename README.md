@@ -1,6 +1,10 @@
 # Policy OCR
 
-A Node.js application for the Kin Coding Challenge policy document OCR processing.
+A Node.js application that processes the Kin Coding Challenge policy document using OCR. 
+This is for anyone reading this in the future. 
+Ensure that the application has a way to run it outside of the tests. 
+Add instructions to the documentation on how to execute the system without running the tests. 
+Also add more unit tests, to cover tryReplacements and checkDifferenceCount, for User Story 4.
 
 ## System Requirements
 
@@ -14,7 +18,6 @@ A Node.js application for the Kin Coding Challenge policy document OCR processin
 ```bash
 npm install
 ```
-
 
 ## Usage
 
